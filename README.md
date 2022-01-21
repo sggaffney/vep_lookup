@@ -1,14 +1,31 @@
 # vep_lookup
 
-Add a short description here!
+Look up VEP variant annotation via CLI.
 
+```text
+Usage: lookup_vep [OPTIONS] CHROM POS REF ALT
 
-## Description
+  VEP lookup for CHROM:POS REF>ALT.
 
-A longer description of your project goes here...
+Options:
+  -b, --genome [37|38]  Genome version
+  --help                Show this message and exit.
+```
 
+```shell
+# Example: Look up 5:7520801 G>A
+lookup_vep -b38 5 7520801 G A
+```
 
-<!-- pyscaffold-notes -->
+## Installation
+
+```shell
+# Option 1: Remote pip install directly from GitHub
+pip install git+https://github.com/sggaffney/vep_lookup.git
+
+# Option 2: Run from lookup_vep code directory
+python setup.py develop
+```
 
 ## Note
 
