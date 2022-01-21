@@ -13,6 +13,9 @@ SERVER_38 = "https://rest.ensembl.org"
 SERVER_37 = "http://grch37.rest.ensembl.org"
 ENDPOINT = "vep/human/hgvs"
 
+class InputException(Exception):
+    pass
+
 
 def get_var_tables(chrom, pos, ref, alt, genome=37):
     """Get info tables for specified variant."""
@@ -26,14 +29,34 @@ def get_var_tables(chrom, pos, ref, alt, genome=37):
         params={"content-type": "application/json", "canonical": "1"},
     )
     if "error" in r.json():
-        raise Exception(r.json()["error"])
+        raise InputException(r.json()["error"])
 
     j = r.json()[0]
     other_keys = set(j.keys()).difference(
         ["transcript_consequences", "colocated_variants"]
     )
     meta = pd.Series({i: j[i] for i in sorted(other_keys)})
-    consequences = pd.DataFrame(j["transcript_consequences"])
+    meta = meta.to_frame().T
+
+    if 'transcript_consequences' in j:
+        consequences = _parse_consequences(j)
+    else:
+        consequences = pd.DataFrame()
+
+    if "colocated_variants" in j:
+        colocated = pd.DataFrame(j["colocated_variants"])
+    else:
+        colocated = pd.DataFrame()
+
+    return {
+        "meta": meta,
+        "consequences": consequences,
+        "colocated": colocated,
+    }
+
+
+def _parse_consequences(parent):
+    consequences = pd.DataFrame(parent["transcript_consequences"])
     consequences["canonical"] = consequences["canonical"].fillna(0).astype(int)
     # rows appear to be sorted by descending sift and/or polyphen score
     first_cols = [
@@ -46,7 +69,6 @@ def get_var_tables(chrom, pos, ref, alt, genome=37):
     # 'polyphen_prediction', 'sift_score', 'polyphen_score'
     other_cols = sorted([i for i in consequences.columns if i not in first_cols])
     consequences = consequences[first_cols + other_cols]
-
     consequences["consequence_terms"] = consequences["consequence_terms"].map(
         lambda v: ";".join(v)
     )
@@ -54,17 +76,7 @@ def get_var_tables(chrom, pos, ref, alt, genome=37):
         consequences["flags"] = consequences["flags"].map(
             lambda v: ";".join(v) if type(v) is list else "." if pd.isna(v) else v
         )
-
-    meta = meta.to_frame().T
-
-    colocated = pd.DataFrame()
-    if "colocated_variants" in j:
-        colocated = pd.DataFrame(j["colocated_variants"])
-    return {
-        "meta": meta,
-        "consequences": consequences,
-        "colocated": colocated,
-    }
+    return consequences
 
 
 def print_tables(table_dict, width=None):
@@ -105,6 +117,9 @@ def print_tables(table_dict, width=None):
         console.print("No colocated variants found.\n")
 
     console.print("CONSEQUENCES", style="red bold underline")
+    if not len(consequences):
+        console.print("No consequences found.\n")
+        return
     skip_conseq_cols = ["gene_symbol_source", "hgnc_id"]
     cq = consequences.copy()
     int_cols = list(cq.convert_dtypes().dtypes.eq("Int64").loc[lambda v: v].index)

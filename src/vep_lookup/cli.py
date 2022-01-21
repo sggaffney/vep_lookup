@@ -29,10 +29,13 @@ def lookup_cli(chrom, pos, ref, alt, genome):
     console = rich.console.Console()
     console.print(f":mag: vep_lookup ({__version__})\n")
     console.print(f"USING BUILD {genome}\n")
-    table_dict = lookup.get_var_tables(
-        chrom=chrom, pos=pos, ref=ref, alt=alt, genome=int(genome)
-    )
-    lookup.print_tables(table_dict)
+    try:
+        table_dict = lookup.get_var_tables(
+            chrom=chrom, pos=pos, ref=ref, alt=alt, genome=int(genome)
+        )
+        lookup.print_tables(table_dict)
+    except lookup.InputException as e:
+        raise click.UsageError(str(e))
 
 
 if __name__ == "__main__":
